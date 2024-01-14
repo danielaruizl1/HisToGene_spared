@@ -8,6 +8,14 @@ import pytorch_lightning as pl
 from torchmetrics.functional import accuracy
 from transformer import ViT
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+import wandb
+import sys
+sys.path.insert(0, '/media/SSD3/daruizl/ST')
+from metrics import get_metrics
+from utils import get_main_parser
+
+parser_ST = get_main_parser()
+args_ST = parser_ST.parse_args()
 
 class FeatureExtractor(nn.Module):
     """Some Information about FeatureExtractor"""
@@ -82,7 +90,6 @@ class ImageClassifier(pl.LightningModule):
         parser.add_argument('--lr', type=float, default=0.0001)
         return parser
 
-
 class STModel(pl.LightningModule):
     def __init__(self, feature_model=None, n_genes=1000, hidden_dim=2048, learning_rate=1e-5, use_mask=False, use_pos=False, cls=False):
         super().__init__()
@@ -140,8 +147,8 @@ class STModel(pl.LightningModule):
         parser.add_argument('--learning_rate', type=float, default=0.0001)
         return parser
 
-
 class HisToGene(pl.LightningModule):
+    
     def __init__(self, patch_size=112, n_layers=4, n_genes=1000, dim=1024, learning_rate=1e-4, dropout=0.1, n_pos=64):
         super().__init__()
         # self.save_hyperparameters()
@@ -151,6 +158,12 @@ class HisToGene(pl.LightningModule):
         self.x_embed = nn.Embedding(n_pos,dim)
         self.y_embed = nn.Embedding(n_pos,dim)
         self.vit = ViT(dim=dim, depth=n_layers, heads=16, mlp_dim=2*dim, dropout = dropout, emb_dropout = dropout)
+        self.opt_metric = args_ST.optim_metric
+        if self.opt_metric == "MSE" or self.opt_metric == "MAE":
+            self.eval_opt_metric = float("inf")
+        else:
+            self.eval_opt_metric = float("-inf")
+        self.best_metrics = None
 
         self.gene_head = nn.Sequential(
             nn.LayerNorm(dim),
@@ -166,25 +179,69 @@ class HisToGene(pl.LightningModule):
         x = self.gene_head(h)
         return x
 
-    def training_step(self, batch, batch_idx):        
-        patch, center, exp = batch
+    def training_step(self, batch, batch_idx):    
+        patch, center, exp, mask = batch
         pred = self(patch, center)
         loss = F.mse_loss(pred.view_as(exp), exp)
+        metrics = get_metrics(exp.squeeze(), pred.view_as(exp).squeeze(), mask.squeeze())
+        train_dict={f'train_{key}': val for key, val in metrics.items()}
+        train_dict["epoch"]=self.current_epoch
+        wandb.log(train_dict)
         self.log('train_loss', loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        patch, center, exp = batch
+        patch, center, exp, mask = batch
         pred = self(patch, center)
         loss = F.mse_loss(pred.view_as(exp), exp)
-        self.log('valid_loss', loss)
-        return loss
+        self.log('val_loss', loss)
+        return exp, pred.view_as(exp), mask
+
+    def validation_epoch_end(self, outputs):
+        exp = torch.cat([i[0] for i in outputs], dim=1)
+        pred = torch.cat([i[1] for i in outputs], dim=1)
+        mask = torch.cat([i[2] for i in outputs], dim=1)
+        metrics = get_metrics(exp.squeeze(), pred.squeeze(), mask.squeeze())
+        val_dict={f'val_{key}': val for key, val in metrics.items()}
+        val_dict["epoch"]=self.current_epoch
+        wandb.log(val_dict)
+        if self.opt_metric == "MSE" or self.opt_metric == "MAE":
+            if metrics[self.opt_metric] < self.eval_opt_metric:
+                self.best_metrics = metrics
+                bestval_dict={f'best_val_{key}': val for key, val in self.best_metrics.items()}
+                bestval_dict["epoch"]=self.current_epoch
+                wandb.log(bestval_dict)
+            self.eval_opt_metric = min(metrics[self.opt_metric], self.eval_opt_metric)
+        else:
+            if metrics[self.opt_metric] > self.eval_opt_metric:
+                self.best_metrics = metrics
+                bestval_dict={f'best_val_{key}': val for key, val in self.best_metrics.items()}
+                bestval_dict["epoch"]=self.current_epoch
+                wandb.log(bestval_dict)
+            self.eval_opt_metric = max(metrics[self.opt_metric], self.eval_opt_metric)
 
     def test_step(self, batch, batch_idx):
-        patch, center, exp = batch
+        patch, center, exp, mask = batch 
+        #patch, center, exp = batch 
         pred = self(patch, center)
         loss = F.mse_loss(pred.view_as(exp), exp)
-        self.log('test_loss', loss)
+        metrics = get_metrics(exp.squeeze(), pred.view_as(exp).squeeze(), mask.squeeze())
+        #metrics = get_metrics(exp.squeeze(), pred.view_as(exp).squeeze())
+        test_dict={f'test_{key}': val for key, val in metrics.items()}
+        test_dict["epoch"]=self.current_epoch
+        wandb.log(test_dict)
+        return exp, pred.view_as(exp), mask
+        #return exp, pred.view_as(exp)
+
+    def test_epoch_end(self, outputs):
+        exp = torch.cat([i[0] for i in outputs], dim=1)
+        pred = torch.cat([i[1] for i in outputs], dim=1)
+        mask = torch.cat([i[2] for i in outputs], dim=1)
+        metrics = get_metrics(exp.squeeze(), pred.squeeze(), mask.squeeze())
+        #metrics = get_metrics(exp.squeeze(), pred.squeeze())
+        test_dict={f'test_{key}': val for key, val in metrics.items()}
+        test_dict["epoch"]=self.current_epoch
+        wandb.log(test_dict)
 
     def configure_optimizers(self):
         # self.hparams available because we called self.save_hyperparameters()

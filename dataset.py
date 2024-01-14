@@ -2,12 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from utils import read_tiff
+from utils_hist import read_tiff
 import numpy as np
 import torchvision
 import torchvision.transforms as transforms
 import scanpy as sc
-from utils import get_data
 import os
 import glob
 from PIL import Image

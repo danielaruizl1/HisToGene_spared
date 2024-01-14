@@ -10,12 +10,7 @@ from transformer import ViT
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import wandb
 import sys
-sys.path.insert(0, '/media/SSD3/daruizl/ST')
-from metrics import get_metrics
-from utils import get_main_parser
-
-parser_ST = get_main_parser()
-args_ST = parser_ST.parse_args()
+from spared.metrics import get_metrics
 
 class FeatureExtractor(nn.Module):
     """Some Information about FeatureExtractor"""
@@ -158,7 +153,8 @@ class HisToGene(pl.LightningModule):
         self.x_embed = nn.Embedding(n_pos,dim)
         self.y_embed = nn.Embedding(n_pos,dim)
         self.vit = ViT(dim=dim, depth=n_layers, heads=16, mlp_dim=2*dim, dropout = dropout, emb_dropout = dropout)
-        self.opt_metric = args_ST.optim_metric
+        #FIXME: add option for different opt metrics
+        self.opt_metric = "MSE"
         if self.opt_metric == "MSE" or self.opt_metric == "MAE":
             self.eval_opt_metric = float("inf")
         else:
@@ -169,6 +165,8 @@ class HisToGene(pl.LightningModule):
             nn.LayerNorm(dim),
             nn.Linear(dim, n_genes)
         )
+        self.validation_step_outputs = []
+        self.test_step_outputs = []
 
     def forward(self, patches, centers):
         patches = self.patch_embedding(patches)
@@ -195,9 +193,12 @@ class HisToGene(pl.LightningModule):
         pred = self(patch, center)
         loss = F.mse_loss(pred.view_as(exp), exp)
         self.log('val_loss', loss)
-        return exp, pred.view_as(exp), mask
+        outputs = (exp, pred.view_as(exp), mask)
+        self.validation_step_outputs.append(outputs)
+        return outputs
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
+        outputs = self.validation_step_outputs
         exp = torch.cat([i[0] for i in outputs], dim=1)
         pred = torch.cat([i[1] for i in outputs], dim=1)
         mask = torch.cat([i[2] for i in outputs], dim=1)
@@ -230,10 +231,13 @@ class HisToGene(pl.LightningModule):
         test_dict={f'test_{key}': val for key, val in metrics.items()}
         test_dict["epoch"]=self.current_epoch
         wandb.log(test_dict)
-        return exp, pred.view_as(exp), mask
+        outputs = (exp, pred.view_as(exp), mask)
+        self.test_step_outputs.append(outputs)
+        return outputs
         #return exp, pred.view_as(exp)
 
-    def test_epoch_end(self, outputs):
+    def on_test_epoch_end(self):
+        outputs = self.test_step_outputs
         exp = torch.cat([i[0] for i in outputs], dim=1)
         pred = torch.cat([i[1] for i in outputs], dim=1)
         mask = torch.cat([i[2] for i in outputs], dim=1)

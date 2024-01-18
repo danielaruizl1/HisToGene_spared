@@ -144,7 +144,7 @@ class STModel(pl.LightningModule):
 
 class HisToGene(pl.LightningModule):
     
-    def __init__(self, patch_size=112, n_layers=4, n_genes=1000, dim=1024, learning_rate=1e-4, dropout=0.1, n_pos=64):
+    def __init__(self, patch_size=112, n_layers=4, n_genes=1000, dim=1024, learning_rate=1e-4, dropout=0.1, n_pos=64, opt_metric="MSE"):
         super().__init__()
         # self.save_hyperparameters()
         self.learning_rate = learning_rate
@@ -153,8 +153,7 @@ class HisToGene(pl.LightningModule):
         self.x_embed = nn.Embedding(n_pos,dim)
         self.y_embed = nn.Embedding(n_pos,dim)
         self.vit = ViT(dim=dim, depth=n_layers, heads=16, mlp_dim=2*dim, dropout = dropout, emb_dropout = dropout)
-        #FIXME: add option for different opt metrics
-        self.opt_metric = "MSE"
+        self.opt_metric = opt_metric
         if self.opt_metric == "MSE" or self.opt_metric == "MAE":
             self.eval_opt_metric = float("inf")
         else:

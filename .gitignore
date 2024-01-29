@@ -4,3 +4,5 @@ data/
 processed_data/
 spared
 wandb/
+wandb_runs_csv
+optimal_models/

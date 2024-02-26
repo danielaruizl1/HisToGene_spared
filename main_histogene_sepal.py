@@ -16,13 +16,20 @@ from datetime import datetime
 from anndata.experimental.pytorch import AnnLoader
 import pandas as pd
 
+# Auxiliary function to use booleans in parser
+str2bool = lambda x: (str(x).lower() == 'true')
+str2intlist = lambda x: [int(i) for i in x.split(',')]
+str2floatlist = lambda x: [float(i) for i in x.split(',')]
+str2h_list = lambda x: [str2intlist(i) for i in x.split('//')[1:]]
+
 # Add argparse
 parser = argparse.ArgumentParser(description="Arguments for training HisToGene")
 parser.add_argument("--dataset", type=str, default="10xgenomic_human_breast_cancer", help="Dataset to use")
 parser.add_argument("--prediction_layer", type=str, default="c_d_log1p", help="Layer to use for prediction")
 parser.add_argument('--lr', type=float, default=5e-4, help='Learning rate')
-parser.add_argument('--max_steps', type=int, default=1000, help='Number of iterations')
-parser.add_argument('--val_check_interval', type=int, default=10, help='Number of iterations between validation check')
+parser.add_argument('--use_optimal_lr', type=str2bool, default=False, help='Whether or not to use the optimal learning rate in csv for the dataset.')
+parser.add_argument('--max_steps', type=int, default=1000, help='Number of iterations'),
+parser.add_argument('--val_check_interval', type=int, default=10, help='Number of iterations between validation check'),
 parser.add_argument('--opt_metric', type=str, default="MSE", help='Metric to optimize')
 args = parser.parse_args()
 
@@ -38,7 +45,8 @@ wandb_logger = WandbLogger(
     project="spared_histogene_sota",
     name=args.exp_name,
     log_model=False,
-    config=vars(args)
+    config=vars(args),
+    entity="sepal_v2"
 )
 
 # Get datasets from the values defined in args
@@ -53,6 +61,14 @@ os.makedirs(save_path, exist_ok=True)
 # Save script arguments in json file
 with open(os.path.join(save_path, 'script_params.json'), 'w') as f:
     json.dump(vars(args), f, indent=4)
+
+# Obtain optimal lr depending on the dataset
+if args.use_optimal_lr:
+    optimal_models_directory_path =  '/media/SSD4/gmmejia/SEPAL/wandb_runs_csv/optimal_models_lr.csv'
+    optimal_lr_df = pd.read_csv(optimal_models_directory_path)
+    optimal_lr = float(optimal_lr_df[optimal_lr_df['Dataset'] == args.dataset]['histogene'])
+    args.lr = optimal_lr
+    print(f'Optimal lr for {args.dataset} is {optimal_lr}')
 
 # Get dataloaders 
 train_loader = DataLoader(train_dataset, batch_size=1, num_workers=4, shuffle=True)

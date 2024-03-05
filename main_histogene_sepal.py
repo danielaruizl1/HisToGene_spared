@@ -30,6 +30,7 @@ parser.add_argument('--lr', type=float, default=5e-4, help='Learning rate')
 parser.add_argument('--use_optimal_lr', type=str2bool, default=False, help='Whether or not to use the optimal learning rate in csv for the dataset.')
 parser.add_argument('--max_steps', type=int, default=1000, help='Number of iterations'),
 parser.add_argument('--val_check_interval', type=int, default=10, help='Number of iterations between validation check'),
+parser.add_argument('--noisy_training', type=str2bool, default=False, help='Whether or not to do noisy training'),
 parser.add_argument('--opt_metric', type=str, default="MSE", help='Metric to optimize')
 args = parser.parse_args()
 
@@ -51,7 +52,21 @@ wandb_logger = WandbLogger(
 
 # Get datasets from the values defined in args
 dataset = get_dataset(args.dataset)
-dataset.adata.X = dataset.adata.layers[args.prediction_layer].astype(np.float32)
+
+if args.noisy_training:    
+    # Copy the layer c_d_log1p to the layer noisy
+    c_d_log1p = dataset.adata.layers['c_d_log1p'].astype(np.float32).copy()
+    # Get zero mask
+    zero_mask = ~dataset.adata.layers['mask']
+    # Zero out the missing values
+    c_d_log1p[zero_mask] = 0
+    # Add the layer to the adata
+    dataset.adata.X = c_d_log1p
+    # Give warning to say that the noisy layer is being used
+    print('Using noisy layer for training. This will probably yield bad results.')
+else:
+    dataset.adata.X = dataset.adata.layers[args.prediction_layer].astype(np.float32)
+
 train_dataset = HisToGeneDataset(dataset.adata, "train")
 val_dataset = HisToGeneDataset(dataset.adata, "val")
 

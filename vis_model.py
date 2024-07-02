@@ -10,7 +10,7 @@ from transformer import ViT
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import wandb
 import sys
-from spared.metrics import get_metrics
+from spared.spared.metrics import get_metrics
 
 class FeatureExtractor(nn.Module):
     """Some Information about FeatureExtractor"""

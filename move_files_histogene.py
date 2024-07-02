@@ -3,10 +3,10 @@ import os
 import pandas as pd
 
 # Upload the csv file with the optimal models
-df = pd.read_csv('wandb_runs_csv/optimal_models_names.csv')
+df = pd.read_csv('wandb_runs_csv/optimal_models_names_ctlog1p.csv', sep=";")
 
 # Define datafrae of optimal models for specific sota
-sota = "HisToGene"
+sota = "histogene"
 df_seleccionado = df[['Dataset', sota]]
 
 assert sota in df.columns, AssertionError('Sota still not in csv file')

@@ -79,8 +79,8 @@ with open(os.path.join(save_path, 'script_params.json'), 'w') as f:
 
 # Obtain optimal lr depending on the dataset
 if args.use_optimal_lr:
-    optimal_models_directory_path =  '/media/SSD4/gmmejia/SEPAL/wandb_runs_csv/optimal_models_lr.csv'
-    optimal_lr_df = pd.read_csv(optimal_models_directory_path)
+    optimal_models_directory_path =  '/home/daruizl/HisToGene_SEPAL/wandb_runs_csv/optimal_models_lr_ctlog1p.csv'
+    optimal_lr_df = pd.read_csv(optimal_models_directory_path, sep=";")
     optimal_lr = float(optimal_lr_df[optimal_lr_df['Dataset'] == args.dataset]['histogene'])
     args.lr = optimal_lr
     print(f'Optimal lr for {args.dataset} is {optimal_lr}')

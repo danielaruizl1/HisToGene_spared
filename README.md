@@ -1,7 +1,25 @@
-# Leveraging information in spatial transcriptomics to predict super-resolution gene expression from histology images in tumors
-### Minxing Pang, Kenong Su*, Mingyao Li*
-HisToGene is a deep learning method that predicts super-resolution gene expression from histology images in tumors. Trained in a spatial transcriptomics dataset, HisToGene models the spatial dependency in gene expression and histological features among spots through a modified Vision Transformer model. [[bioRxiv]](https://doi.org/10.1101/2021.11.28.470212)
-<img src="Workflow.PNG" width="800px"></img>
+## Set up
+
+Run the following to define your environment in terminal:
+
+```bash
+conda create -n histogene_spared
+conda activate histogene_spared
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+conda install lightning -c conda-forge
+pip install torch-geometric==2.3.1
+pip install squidpy
+pip install wandb
+pip install wget
+pip install combat
+pip install opencv-python
+pip install positional-encodings[pytorch]
+pip install plotly
+pip install sh
+pip install einops
+
+```
+
 # Usage
 ```python
 import torch

@@ -43,7 +43,7 @@ args.exp_name = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
 # Start wandb configs
 wandb_logger = WandbLogger(
-    project="spared_histogene_sota",
+    project="histogene_spared",
     name=args.exp_name,
     log_model=False,
     config=vars(args),

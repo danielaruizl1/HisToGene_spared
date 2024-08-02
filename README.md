@@ -18,54 +18,20 @@ pip install plotly
 pip install sh
 pip install einops
 
+export PYTHONPATH=/anaconda3/envs/histogene_spared/lib/python3.10/site-packages/spared:$PYTHONPATH
 ```
 
-# Usage
-```python
-import torch
-from vis_model import HisToGene
+## Train HisToGene
 
-model = HisToGene(
-    n_genes=1000, 
-    patch_size=112, 
-    n_layers=4, 
-    dim=1024, 
-    learning_rate=1e-5, 
-    dropout=0.1, 
-    n_pos=64
-)
-
-# flatten_patches: [N, 3*W*H]
-# coordinates: [N, 2]
-
-pred_expression = model(flatten_patches, coordinates)  # [N, n_genes]
-
+To use a dataset from spared, train HisToGene by running:
+```bash
+python main_histogene_spared.py --dataset spared_dataset_name
 ```
 
-## System environment
-Required package:
-- PyTorch >= 1.8
-- pytorch-lightning >= 1.4
-- scanpy >= 1.8
+To use a dataset not included in spared, train HisToGene by running:
+```bash
+cd v2
+python main_histogene_spared.py --dataset adata_path
+```
+`adata_path` should be the path to an adata.h5ad with the same structure than the used for SpaRED adata files.
 
-## Parameters
-- `n_genes`: int.  
-  Amount of genes.
-- `patch_size`: int.  
-  Width/diameter of the spots.
-- `n_layers`: int, default `4`.  
-  Number of Transformer blocks.
-- `dim`: int.  
-  Dimension of the embeddings.
-- `learning_rate`: float between `[0, 1]`, default `1e-5`.  
-  Learning rate.
-- `dropout`: float between `[0, 1]`, default `0.1`.  
-  Dropout rate in the Transformer.
-- `n_pos`: int, default `64`.  
-   Maximum number of the coordinates.
-
-# HisToGene pipeline
-See [tutorial.ipynb](tutorial.ipynb)
-
-# References
-https://github.com/almaan/her2st

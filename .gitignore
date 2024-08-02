@@ -1,8 +1,11 @@
 __pycache__/
 checkpoints/
-data/
-processed_data/
-spared
-wandb/
-wandb_runs_csv
+imput_results/
+lightning_logs/
 optimal_models/
+processed_data/
+PublicDatabase/
+wandb/
+wandb_runs_csv/
+move_files_histogene.py
+

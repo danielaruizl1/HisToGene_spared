@@ -8,6 +8,7 @@ import json
 import torch_geometric
 from pytorch_lightning.callbacks import ModelCheckpoint
 from spared.datasets import HisToGeneDataset, get_dataset
+from spared.denoising import spackle_cleaner
 from torch.utils.data import DataLoader
 from vis_model import HisToGene
 from utils_hist import *
@@ -15,6 +16,7 @@ from pytorch_lightning.loggers import WandbLogger
 from datetime import datetime
 from anndata.experimental.pytorch import AnnLoader
 import pandas as pd
+import sys
 
 # Auxiliary function to use booleans in parser
 str2bool = lambda x: (str(x).lower() == 'true')
@@ -22,13 +24,14 @@ str2intlist = lambda x: [int(i) for i in x.split(',')]
 str2floatlist = lambda x: [float(i) for i in x.split(',')]
 str2h_list = lambda x: [str2intlist(i) for i in x.split('//')[1:]]
 
+# FIXME: This argparser is not working because of get_dataset
 # Add argparse
 parser = argparse.ArgumentParser(description="Arguments for training HisToGene")
 parser.add_argument("--dataset", type=str, default="10xgenomic_human_breast_cancer", help="Dataset to use")
-parser.add_argument("--prediction_layer", type=str, default="c_d_log1p", help="Layer to use for prediction")
-parser.add_argument('--lr', type=float, default=5e-4, help='Learning rate')
+parser.add_argument("--prediction_layer", type=str, default="c_t_log1p", help="Layer to use for prediction")
+parser.add_argument('--lr', type=float, default=0.004642, help='Learning rate')
 parser.add_argument('--use_optimal_lr', type=str2bool, default=False, help='Whether or not to use the optimal learning rate in csv for the dataset.')
-parser.add_argument('--max_steps', type=int, default=1000, help='Number of iterations'),
+parser.add_argument('--max_steps', type=int, default=2000, help='Number of iterations'),
 parser.add_argument('--val_check_interval', type=int, default=10, help='Number of iterations between validation check'),
 parser.add_argument('--noisy_training', type=str2bool, default=False, help='Whether or not to do noisy training'),
 parser.add_argument('--opt_metric', type=str, default="MSE", help='Metric to optimize')
@@ -47,11 +50,21 @@ wandb_logger = WandbLogger(
     name=args.exp_name,
     log_model=False,
     config=vars(args),
-    entity="sepal_v2"
 )
 
 # Get datasets from the values defined in args
-dataset = get_dataset(args.dataset)
+dataset = get_dataset(args.dataset, visualize=False)
+
+# Denoise the dataset if necessary
+if (args.prediction_layer == 'c_t_log1p') and (not args.prediction_layer in dataset.adata.layers):
+    dataset.adata, _  = spackle_cleaner(adata=dataset.adata, dataset=args.dataset, from_layer="c_d_log1p", to_layer="c_t_log1p", device=device)
+    # Replace current adata.h5ad file for the one with the completed data layer.
+    dataset.adata.write_h5ad(os.path.join(dataset.dataset_path, "adata.h5ad"))
+
+elif (args.prediction_layer == "c_t_deltas") and (not args.prediction_layer in dataset.adata.layers):
+    dataset.adata, _  = spackle_cleaner(adata=dataset.adata, dataset=args.dataset, from_layer="c_d_deltas", to_layer="c_t_deltas", device=device)
+    # Replace current adata.h5ad file for the one with the completed data layer.
+    dataset.adata.write_h5ad(os.path.join(dataset.dataset_path, "adata.h5ad"))
 
 if args.noisy_training:    
     # Copy the layer c_d_log1p to the layer noisy
@@ -105,7 +118,9 @@ trainer = pl.Trainer(
 )
 
 # Get dataset config json
-with open(os.path.join("spared","configs", f"{args.dataset}.json")) as json_file:
+spared_path = next((path for path in sys.path if 'spared' in path), None)
+dataset_config_path = os.path.join(spared_path,"configs",args.dataset+".json")
+with open(dataset_config_path) as json_file:
     dataset_config = json.load(json_file)
 
 # Declare model
@@ -189,6 +204,6 @@ def get_predictions(model)->None:
 get_predictions(model.to(device))
 
 # Get log final artifacts
-dataset.log_pred_image()
+#dataset.log_pred_image()
 
 wandb.finish()

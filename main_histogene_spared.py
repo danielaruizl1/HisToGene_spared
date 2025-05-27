@@ -7,7 +7,7 @@ import wandb
 import json
 import torch_geometric
 from pytorch_lightning.callbacks import ModelCheckpoint
-from spared.datasets import HisToGeneDataset, get_dataset
+from spared.spared_datasets import HisToGeneDataset, get_dataset
 from spared.denoising import spackle_cleaner
 from torch.utils.data import DataLoader
 from vis_model import HisToGene
@@ -35,6 +35,7 @@ parser.add_argument('--max_steps', type=int, default=2000, help='Number of itera
 parser.add_argument('--val_check_interval', type=int, default=10, help='Number of iterations between validation check'),
 parser.add_argument('--noisy_training', type=str2bool, default=False, help='Whether or not to do noisy training'),
 parser.add_argument('--opt_metric', type=str, default="MSE", help='Metric to optimize')
+parser.add_argument("--original_index", type=str2bool, default=False, help="Whether to use the original index")
 args = parser.parse_args()
 
 # Declare device
@@ -54,6 +55,8 @@ wandb_logger = WandbLogger(
 
 # Get datasets from the values defined in args
 dataset = get_dataset(args.dataset, visualize=False)
+if args.original_index:
+    dataset.adata = dataset.adata[:, np.argsort(dataset.adata.var['original_index'].astype(int))].copy()
 
 # Denoise the dataset if necessary
 if (args.prediction_layer == 'c_t_log1p') and (not args.prediction_layer in dataset.adata.layers):

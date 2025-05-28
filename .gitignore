@@ -9,3 +9,5 @@ wandb/
 wandb_runs_csv/
 move_files_histogene.py
 spared
+data/
+wandb_runs_csv
